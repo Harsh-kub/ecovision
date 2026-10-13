@@ -1,0 +1,264 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#245c43">
+    <meta name="description" content="EcoVision - AI-assisted sustainability insights and environmental impact awareness">
+    <title>EcoVision | Smart Sustainability</title>
+
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+
+<body>
+
+    <!-- LOGIN PAGE -->
+    <main id="loginPage" class="login">
+
+        <section class="login-left">
+
+            <div class="login-brand">
+                <div class="brand">
+                    <div class="brand-symbol">♧</div>
+                    <div>
+                        EcoVision
+                        <small>SMART LIVING</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="login-story">
+
+                <div class="eyebrow">
+                    SMART SUSTAINABILITY
+                </div>
+
+                <h1>
+                    See the planet.<br>
+                    Understand the impact.
+                </h1>
+
+                <p>
+                    Discover how AI-assisted analysis can help
+                    understand environmental impact, explore resource
+                    use and identify opportunities for a more
+                    sustainable future.
+                </p>
+
+            </div>
+
+            <footer class="login-foot">
+                © 2026 EcoVision
+            </footer>
+
+        </section>
+
+        <!-- SIGN-IN FORM -->
+        <section class="login-right">
+
+            <div class="login-form-wrap">
+
+                <div class="eyebrow">
+                    WELCOME TO ECOVISION
+                </div>
+
+                <h2>Welcome</h2>
+
+                <p>
+                    Sign in to continue to your sustainability workspace.
+                </p>
+
+                <form id="loginForm">
+
+                    <div class="field">
+                        <label for="email">Email address</label>
+                        <input
+                            id="email"
+                            type="email"
+                            placeholder="Enter any email"
+                            autocomplete="username"
+                            required
+                        >
+                    </div>
+
+                    <div class="field">
+                        <label for="password">Password</label>
+
+                        <div class="password-box">
+                            <input
+                                id="password"
+                                type="password"
+                                placeholder="Enter any password"
+                                autocomplete="current-password"
+                                required
+                            >
+
+                            <button id="togglePassword" type="button">
+                                Show
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="role">Sign in as</label>
+
+                        <select id="role">
+                            <option value="admin">
+                                Property Administrator
+                            </option>
+
+                            <option value="resident">
+                                Resident
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="remember-row">
+                        <label>
+                            <input
+                                id="rememberMe"
+                                type="checkbox"
+                                checked
+                            >
+                            Remember me
+                        </label>
+                    </div>
+
+                    <p
+                        id="loginError"
+                        class="error-message"
+                        aria-live="polite"
+                    ></p>
+
+                    <button
+                        class="btn primary login-submit"
+                        type="submit"
+                    >
+                        Sign in to EcoVision →
+                    </button>
+
+                </form>
+
+                <div class="login-small">
+                    EcoVision sustainability workspace
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- MAIN APPLICATION -->
+    <div id="appPage" class="app-shell" hidden>
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+
+            <div class="brand sidebar-brand">
+                <div class="brand-symbol">♧</div>
+                <div>
+                    EcoVision
+                    <small>SMART LIVING</small>
+                </div>
+            </div>
+
+            <div class="property-chip">
+                <div class="property-icon">⌂</div>
+
+                <div>
+                    <strong>XYZ Steel Factory</strong>
+                    <small id="propertyRole">Factory management</small>
+                </div>
+            </div>
+
+            <div class="nav-heading">WORKSPACE</div>
+
+            <nav
+                id="navigation"
+                class="nav-list"
+                aria-label="Main navigation"
+            >
+            </nav>
+
+            <div class="sidebar-bottom">
+
+                <div class="help-box" id="helpBox">
+                    <strong>🌱 Sustainability matters</strong>
+
+                    <p>
+                        Explore environmental indicators and practical
+                        ideas for improving resource efficiency.
+                    </p>
+                </div>
+
+                <div class="profile">
+
+                    <div class="avatar" id="profileAvatar">
+                        HK
+                    </div>
+
+                    <div class="profile-info">
+                        <strong id="profileName">Harsh Kubade</strong>
+                        <small id="profileTitle">
+                            Factory Administrator
+                        </small>
+                    </div>
+
+                    <button
+                        id="logoutButton"
+                        class="logout"
+                        type="button"
+                        title="Sign out"
+                    >
+                        ↪
+                    </button>
+
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="app-main">
+
+            <header class="topbar">
+
+                <div>
+                    <small id="breadcrumb">
+                        XYZ Steel Factory / Overview
+                    </small>
+
+                    <h2 id="pageHeading">Overview</h2>
+                </div>
+
+                <div class="top-right">
+                    <span id="currentDate" class="date-label"></span>
+
+                    <span class="demo-label">
+                        ● Demo mode
+                    </span>
+                </div>
+
+            </header>
+
+            <section id="mainContent" class="content">
+            </section>
+
+        </main>
+
+    </div>
+
+    <!-- NOTIFICATION -->
+    <div
+        id="toast"
+        class="toast"
+        role="status"
+        aria-live="polite"
+        hidden
+    ></div>
+
+</body>
+</html>
