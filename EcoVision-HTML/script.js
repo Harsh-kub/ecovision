@@ -25,6 +25,9 @@ const state = {
     energy: 15,
     water: 12,
     recycling: 20,
+    productionGrowth: 3,
+    baselineEnergyMWh: 1248,
+    baselineEmissionsT: 620,
     reportPeriod: "Monthly",
     lastResult: null,
     processing: null,
@@ -375,7 +378,7 @@ $("#loginForm").addEventListener("submit", event => {
 
     const email = $("#email").value.trim();
     const password = $("#password").value;
-    const role = $("#role").value;
+    const role = "admin";
 
     if (
         !email ||
@@ -392,7 +395,7 @@ $("#loginForm").addEventListener("submit", event => {
     state.selectedFloor = 1;
     state.selectedCamera = null;
     state.lastResult = null;
-    state.page = role === "admin" ? "Overview" : "Factory Overview";
+    state.page = "Overview";
 
     $("#loginError").textContent = "";
     $("#loginPage").hidden = true;
@@ -416,7 +419,7 @@ $("#logoutButton").addEventListener("click", () => {
    ===================================================== */
 
 function renderNavigation() {
-    const nav = isAdmin() ? adminPages : residentPages;
+    const nav = adminPages;
 
     const activePage =
         state.scanMode && state.page === "Digital Twin"
@@ -456,30 +459,43 @@ $("#appPage").addEventListener("click", event => {
    ===================================================== */
 
 function renderChart() {
-    const values = state.chartPeriod === "Week"
-        ? [45, 57, 49, 66, 61, 74, 82]
-        : state.chartPeriod === "Year"
-            ? [39, 47, 44, 55, 51, 62, 58, 69, 72, 78, 74, 86]
-            : [42, 56, 49, 63, 59, 72, 66, 80, 75, 84, 79, 88];
-
-    const labels = state.chartPeriod === "Week"
-        ? ["M", "T", "W", "T", "F", "S", "S"]
-        : state.chartPeriod === "Year"
-            ? ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
-            : Array.from({ length: 12 }, (_, i) => String(i + 1));
+    // Illustrative demo values only; these are not measured factory readings.
+    const periods = {
+        Week: {
+            values: [450, 570, 490, 660, 610, 740, 820],
+            labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        },
+        Month: {
+            values: [420, 560, 490, 630, 590, 720, 660, 800, 750, 840, 790, 880],
+            labels: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
+        },
+        Year: {
+            values: [390, 470, 440, 550, 510, 620, 580],
+            labels: ["2020", "2021", "2022", "2023", "2024", "2025", "2026"]
+        }
+    };
+    const { values, labels } = periods[state.chartPeriod] || periods.Month;
+    const maxValue = Math.ceil(Math.max(...values) / 20) * 20;
 
     return `
-        <div class="chart">
-            ${values.map((value, index) => `
-                <div class="bar-column">
-                    <div class="bar" style="height:${value}%"></div>
-                    <span class="bar-label">${labels[index]}</span>
+        <div class="chart-wrap">
+            <div class="chart-y-title">Energy Consumed (MWh)</div>
+            <div class="chart-y-ticks" aria-hidden="true">
+                <span>${maxValue}</span><span>${Math.round(maxValue * .75)}</span>
+                <span>${Math.round(maxValue * .5)}</span><span>${Math.round(maxValue * .25)}</span><span>0</span>
+            </div>
+            <div class="chart-area">
+                <div class="chart">
+                    ${values.map((value, index) => `
+                        <div class="bar-column" title="${labels[index]}: ${value} MWh (illustrative)">
+                            <div class="bar" style="height:${Math.max(4, value / maxValue * 100)}%"></div>
+                            <span class="bar-label">${labels[index]}</span>
+                        </div>
+                    `).join("")}
                 </div>
-            `).join("")}
+            </div>
         </div>
-        <div class="legend">
-            ● Illustrative factory efficiency indicator · Not live sensor readings
-        </div>
+        <div class="legend">Illustrative MWh values for demonstration only · Not live meter readings</div>
     `;
 }
 
@@ -544,8 +560,8 @@ function renderOverview() {
         <div class="grid columns">
             <div class="panel">
                 <div class="panel-title">
-                    <div><h3>Energy performance</h3>
-                    <p>Illustrative factory efficiency trend</p></div>
+                    <div><h3>Energy Consumption Trend</h3>
+                    <p>Illustrative consumption pattern by selected period</p></div>
                     <div class="tabs">
                         ${["Week", "Month", "Year"].map(period => `
                             <button type="button" data-period="${period}"
@@ -1308,7 +1324,9 @@ function getAssistantAnswer(question) {
     return "EcoVision demonstrates industrial sustainability monitoring through camera-area selection, illustrative equipment labels, energy indicators, carbon estimates, example worker counts and temperature readings. Connect real sensors and validated models before using the results for operational decisions.";
 }
 
-function sendAssistantMessage(question) {
+
+
+async function sendAssistantMessage(question) {
     const text = question.trim();
 
     if (!text) {
@@ -1317,16 +1335,40 @@ function sendAssistantMessage(question) {
     }
 
     state.messages.push({ mine: true, text });
-
-    state.messages.push({
-        mine: false,
-        text: getAssistantAnswer(text)
-    });
-
     state.question = "";
+    renderPageIntoMain();
+
+    try {
+        const response = await fetch("http://127.0.0.1:8000/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ message: text })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.detail || "AI request failed.");
+        }
+
+        state.messages.push({
+            mine: false,
+            text: data.reply
+        });
+    } catch (error) {
+        console.error("EcoVision AI error:", error);
+
+        state.messages.push({
+            mine: false,
+            text: "Sorry, I couldn't connect to the AI Assistant. Please try again."
+        });
+    }
 
     renderPageIntoMain();
 }
+
 
 function renderAI() {
     const suggestions = [
@@ -1401,59 +1443,92 @@ function renderAI() {
    ===================================================== */
 
 function renderSimulator() {
-    const score = Math.round(
-        state.energy * 0.45 +
-        state.water * 0.30 +
-        state.recycling * 0.25
-    );
-
+    const score = Math.round(state.energy * 0.45 + state.water * 0.30 + state.recycling * 0.25);
     const controls = [
-        ["energy", "Energy reduction", state.energy],
-        ["water", "Water reduction", state.water],
-        ["recycling", "Resource recovery", state.recycling]
+        ["energy", "Energy reduction target", state.energy],
+        ["water", "Water reduction target", state.water],
+        ["recycling", "Resource recovery target", state.recycling]
     ];
+    const years = [2026, 2027, 2028, 2029];
+    const energyBase = state.baselineEnergyMWh;
+    const emissionsBase = state.baselineEmissionsT;
+    const growth = Number(state.productionGrowth || 0) / 100;
+    const energySavedRate = state.energy / 100;
+    const emissionsSavedRate = Math.min(0.7, energySavedRate * 0.78 + state.recycling / 100 * 0.22);
+    const projections = years.map((year, i) => {
+        const growthFactor = Math.pow(1 + growth, i);
+        const baselineEnergy = energyBase * growthFactor;
+        const scenarioEnergy = baselineEnergy * (1 - energySavedRate);
+        const baselineEmissions = emissionsBase * growthFactor;
+        const scenarioEmissions = baselineEmissions * (1 - emissionsSavedRate);
+        return {
+            year,
+            baselineEnergy: Math.round(baselineEnergy),
+            scenarioEnergy: Math.round(scenarioEnergy),
+            energySaved: Math.round(baselineEnergy - scenarioEnergy),
+            baselineEmissions: Math.round(baselineEmissions),
+            scenarioEmissions: Math.round(scenarioEmissions),
+            avoided: Math.round(baselineEmissions - scenarioEmissions)
+        };
+    });
+    const cumulativeAvoided = projections.reduce((sum, item) => sum + item.avoided, 0);
+    const latest = projections[projections.length - 1];
 
     return `
         <div class="page-heading">
-            <div><div class="eyebrow">SCENARIO MODELLING</div>
+            <div><div class="eyebrow">SCENARIO MODELLING · 2026–2029</div>
             <h1>Industrial Impact Simulator</h1>
-            <p>Explore hypothetical resource-efficiency improvements.</p></div>
+            <p>Compare an illustrative baseline with a proposed efficiency plan through 2029.</p></div>
         </div>
 
-        <div class="grid columns">
-            <div class="panel">
-                <div class="panel-title">
-                    <div><h3>Adjust the scenario</h3>
-                    <p>Move sliders to model potential targets.</p></div>
-                </div>
+        <div class="note"><strong>Important:</strong> These are illustrative projections, not a real forecast or audited emissions estimate. Baseline assumptions: ${energyBase.toLocaleString()} MWh energy and ${emissionsBase.toLocaleString()} tCO₂e emissions in 2026. Change the assumptions only after validating actual site data.</div>
 
+        <div class="grid columns simulator-layout">
+            <div class="panel">
+                <div class="panel-title"><div><h3>Configure improvement plan</h3><p>Adjust targets to see the scenario update.</p></div></div>
                 ${controls.map(([key, label, value]) => `
                     <div class="range-row">
-                        <div class="range-title">
-                            <strong>${label}</strong>
-                            <span id="${key}Value">${value}%</span>
-                        </div>
-                        <input type="range" min="0" max="50" value="${value}"
-                            data-range="${key}" aria-label="${label}">
+                        <div class="range-title"><strong>${label}</strong><span id="${key}Value">${value}%</span></div>
+                        <input type="range" min="0" max="50" step="1" value="${value}" data-range="${key}" aria-label="${label}">
                         <div class="range-endpoints"><span>0%</span><span>50%</span></div>
                     </div>
                 `).join("")}
-
-                <button class="btn block" id="resetSimulator">Reset scenario</button>
+                <div class="range-row">
+                    <div class="range-title"><strong>Annual production growth assumption</strong><span id="growthValue">${state.productionGrowth}%</span></div>
+                    <input type="range" min="0" max="10" step="1" value="${state.productionGrowth}" data-range="productionGrowth" aria-label="Annual production growth assumption">
+                    <div class="range-endpoints"><span>0%</span><span>10%</span></div>
+                </div>
+                <div class="simulator-actions">
+                    <button class="btn" id="scenarioModerate" type="button">Moderate plan</button>
+                    <button class="btn" id="scenarioAmbitious" type="button">Ambitious plan</button>
+                    <button class="btn" id="resetSimulator" type="button">Reset</button>
+                </div>
+                <button class="btn primary block" id="applyScenario" style="margin-top:12px" type="button">Apply scenario</button>
             </div>
 
             <div class="impact-card">
-                <span class="tag">DEMO SCENARIO</span>
+                <span class="tag">ILLUSTRATIVE SCENARIO</span>
                 <div class="impact-number"><span id="impactScore">${score}</span><small>/100</small></div>
-                <strong>Illustrative improvement score</strong>
-                <p>This score is a simulation, not an audited environmental estimate.</p>
-
-                <div class="detail-line"><span>Energy target</span><strong id="energySummary">${state.energy}%</strong></div>
-                <div class="detail-line"><span>Water target</span><strong id="waterSummary">${state.water}%</strong></div>
+                <strong>Improvement score</strong>
+                <p>Weighted planning indicator based on selected energy, water and recovery targets. It is not a certification.</p>
+                <div class="detail-line"><span>Energy reduction</span><strong id="energySummary">${state.energy}%</strong></div>
+                <div class="detail-line"><span>Water reduction</span><strong id="waterSummary">${state.water}%</strong></div>
                 <div class="detail-line"><span>Resource recovery</span><strong id="recyclingSummary">${state.recycling}%</strong></div>
-
-                <button class="btn" id="applyScenario" style="margin-top:20px">Apply scenario</button>
+                <div class="detail-line"><span>2029 energy avoided vs baseline</span><strong id="energySavedSummary">${latest.energySaved.toLocaleString()} MWh</strong></div>
+                <div class="detail-line"><span>2029 emissions avoided vs baseline</span><strong id="emissionsSavedSummary">${latest.avoided.toLocaleString()} tCO₂e</strong></div>
+                <div class="detail-line"><span>Cumulative avoided emissions, 2026–29</span><strong id="cumulativeSummary">${cumulativeAvoided.toLocaleString()} tCO₂e</strong></div>
             </div>
+        </div>
+
+        <div class="panel projection-panel">
+            <div class="panel-title"><div><h3>Baseline vs improvement plan</h3><p>Illustrative annual energy use and emissions trajectory</p></div></div>
+            <div class="table-wrap">
+                <table class="projection-table">
+                    <thead><tr><th>Year</th><th>Baseline energy (MWh)</th><th>Plan energy (MWh)</th><th>Energy avoided (MWh)</th><th>Baseline emissions (tCO₂e)</th><th>Plan emissions (tCO₂e)</th><th>Avoided emissions (tCO₂e)</th></tr></thead>
+                    <tbody>${projections.map(item => `<tr><td>${item.year}</td><td>${item.baselineEnergy.toLocaleString()}</td><td>${item.scenarioEnergy.toLocaleString()}</td><td>${item.energySaved.toLocaleString()}</td><td>${item.baselineEmissions.toLocaleString()}</td><td>${item.scenarioEmissions.toLocaleString()}</td><td>${item.avoided.toLocaleString()}</td></tr>`).join("")}</tbody>
+                </table>
+            </div>
+            <div class="risk-note"><strong>If improvements are not implemented:</strong> under this illustrative production-growth assumption, the baseline continues to rise. Potential consequences include higher energy spend, greater emissions exposure, reduced efficiency headroom and increased difficulty meeting future sustainability targets. Actual risk depends on site operations, tariffs, grid emissions factors and regulations.</div>
         </div>
     `;
 }
@@ -1701,12 +1776,6 @@ function renderPageIntoMain() {
 }
 
 function renderApp() {
-    if (!isAdmin()) {
-        if (!residentPages.some(item => item[1] === state.page)) {
-            state.page = "Factory Overview";
-        }
-    }
-
     renderNavigation();
 
     const title = state.scanMode && state.page === "Digital Twin"
@@ -1845,6 +1914,7 @@ document.addEventListener("input", event => {
     if (key === "energy") state.energy = Number(event.target.value);
     if (key === "water") state.water = Number(event.target.value);
     if (key === "recycling") state.recycling = Number(event.target.value);
+    if (key === "productionGrowth") state.productionGrowth = Number(event.target.value);
 
     const score = Math.round(
         state.energy * 0.45 +
@@ -1859,7 +1929,8 @@ document.addEventListener("input", event => {
         recyclingValue: `${state.recycling}%`,
         energySummary: `${state.energy}%`,
         waterSummary: `${state.water}%`,
-        recyclingSummary: `${state.recycling}%`
+        recyclingSummary: `${state.recycling}%`,
+        growthValue: `${state.productionGrowth}%`
     };
 
     Object.entries(values).forEach(([id, value]) => {
@@ -1872,6 +1943,12 @@ document.addEventListener("input", event => {
 });
 
 /* =====================================================
+document.addEventListener("change", event => {
+    if (event.target.matches('input[data-range]') && state.page === "Impact Simulator") {
+        renderPageIntoMain();
+    }
+});
+
    INITIALISE
    ===================================================== */
 

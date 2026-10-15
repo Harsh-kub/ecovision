@@ -1,4 +1,10 @@
+from pydantic import BaseModel
+from google import genai
+from dotenv import load_dotenv
 
+from pathlib import Path
+
+load_dotenv(Path(__file__).with_name(".env"))
 import io
 import os
 
@@ -41,6 +47,12 @@ ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 # The pretrained model detects objects from its training categories.
 # The model weights are downloaded automatically on first startup.
 model = None
+# Gemini AI Assistant
+gemini_client = None
+
+
+class ChatRequest(BaseModel):
+    message: str
 
 
 def get_model():
@@ -73,6 +85,45 @@ def health():
         "application": "EcoVision",
         "model_loaded": model is not None,
     }
+
+
+@app.post("/chat")
+def chat_with_gemini(request: ChatRequest):
+    global gemini_client
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="Gemini API key is not configured.",
+        )
+
+    try:
+        if gemini_client is None:
+            gemini_client = genai.Client(api_key=api_key)
+
+        response = gemini_client.models.generate_content(
+            model="gemini-3.5-flash-lite",
+            contents=(
+                "You are EcoVision's factory sustainability assistant. "
+                "Answer questions about factory energy use, emissions, "
+                "water conservation, machinery efficiency, and sustainable "
+                "operations. Be practical and clear. Do not invent live "
+                "sensor readings or claim access to factory data unless "
+                "it is provided in the conversation.\n\n"
+                f"User question: {request.message}"
+            ),
+        )
+
+        return {"success": True, "reply": response.text}
+
+    except Exception as exc:
+        print("Gemini API error:", repr(exc))
+        raise HTTPException(
+            status_code=502,
+            detail=f"Gemini request failed: {type(exc).__name__}",
+        )
+
 
 
 @app.post("/analyze")

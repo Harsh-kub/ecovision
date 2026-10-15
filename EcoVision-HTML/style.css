@@ -280,3 +280,28 @@ td{padding:14px 10px;border-bottom:1px solid #edf1e9;font-size:10px}
 .login-story h1{font-size:34px}
 .login-stats{grid-template-columns:1fr}
 }
+
+/* EcoVision updates: clearer energy chart and scenario projections */
+.chart-wrap{display:grid;grid-template-columns:25px 27px minmax(0,1fr);gap:6px;align-items:stretch;min-width:0}
+.chart-y-title{writing-mode:vertical-rl;transform:rotate(180deg);font-size:9px;font-weight:700;color:#718276;text-align:center;letter-spacing:.1px}
+.chart-y-ticks{height:185px;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;padding:1px 0 22px;color:#89978d;font-size:8px}
+.chart-area{min-width:0}
+.chart-area .chart{gap:clamp(2px,1vw,8px);height:185px;padding-left:2px;padding-right:2px}
+.chart-area .bar-column{gap:7px}
+.chart-area .bar-label{font-size:clamp(7px,.75vw,9px);white-space:nowrap}
+.chart-area .bar{max-width:28px}
+.simulator-layout{align-items:start}
+.simulator-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.simulator-actions .btn{flex:1;min-width:105px}
+.projection-panel{margin-top:18px}
+.projection-table{min-width:850px}
+.projection-table th,.projection-table td{white-space:nowrap}
+.risk-note{margin-top:16px;padding:15px;border-radius:10px;background:#fff7e9;border:1px solid #f0e0c3;color:#725a32;font-size:11px;line-height:1.8}
+@media(max-width:760px){
+ .chart-wrap{grid-template-columns:20px 22px minmax(0,1fr);gap:3px}
+ .chart-y-title{font-size:8px}
+ .chart-y-ticks{font-size:7px}
+ .chart-area .chart{gap:2px}
+ .chart-area .bar-label{font-size:7px}
+ .simulator-actions .btn{flex-basis:100%}
+}
