@@ -25,7 +25,21 @@ button:active{transform:scale(.985)}
 .login-left:before{content:"";position:absolute;width:420px;height:420px;border:1px solid #ffffff15;border-radius:50%;right:-230px;top:-170px;box-shadow:0 0 0 55px #ffffff05,0 0 0 110px #ffffff04;pointer-events:none}
 .login-brand,.login-foot{position:relative;z-index:1}
 .login-brand .brand{color:white}
-.login-brand .brand-symbol{background:#e0edce;color:var(--green)}
+.login-brand .brand-symbol{
+  width:110px;
+  height:110px;
+  background:transparent;
+  border-radius:12px;
+  overflow:hidden;
+  flex-shrink:0;
+}
+
+.login-brand .brand-symbol img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  display:block;
+}
 .login-brand small{color:#bdcfbe}
 .login-story{max-width:520px;position:relative;z-index:1;margin:45px 0}
 .login-story .eyebrow{color:#bcd9b5}
@@ -66,7 +80,24 @@ button:active{transform:scale(.985)}
 .app-shell{display:flex;min-height:100vh}
 .sidebar{flex:0 0 242px;width:242px;background:white;border-right:1px solid var(--line);padding:23px 14px;display:flex;flex-direction:column}
 .sidebar>.brand{padding:0 8px 27px;font-size:19px}
-.sidebar .brand-symbol{width:38px;height:38px;border-radius:12px;font-size:22px}
+.sidebar .brand-symbol{
+  width:62px;
+  height:62px;
+  border-radius:10px;
+  background:transparent;
+  overflow:hidden;
+  flex-shrink:0;
+}
+.sidebar .brand-symbol img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    border-radius: 12px;
+}
+.login-brand .brand-symbol img {
+    border-radius: 12px;
+}
 .property-chip{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid var(--line);background:#f7f9f5;border-radius:12px;margin:0 2px 25px}
 .property-icon{width:36px;height:36px;flex-shrink:0;display:grid;place-items:center;border-radius:10px;background:#e3eee0;font-size:20px}
 .property-chip strong{display:block;font-size:11px}
@@ -304,4 +335,24 @@ td{padding:14px 10px;border-bottom:1px solid #edf1e9;font-size:10px}
  .chart-area .chart{gap:2px}
  .chart-area .bar-label{font-size:7px}
  .simulator-actions .btn{flex-basis:100%}
+}
+
+
+/* Rounded EcoVision logo */
+.login-brand .brand-symbol,
+.sidebar .brand-symbol {
+    width: 100px !important;
+    height: 100px !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+    flex-shrink: 0 !important;
+}
+
+.login-brand .brand-symbol img,
+.sidebar .brand-symbol img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    border-radius: 18px !important;
+    display: block !important;
 }

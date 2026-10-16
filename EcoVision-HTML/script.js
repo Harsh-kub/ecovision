@@ -981,7 +981,6 @@ function renderOverview() {
                 Open Digital Twin →
             </button>
         </div>
-
         ${renderMetrics()}
 
         ${result ? `
@@ -2290,15 +2289,15 @@ function renderApp() {
         }
     );
 
-    $("#profileName").textContent = isAdmin()
-        ? "Harsh Kubade"
-        : "Factory Employee";
+   $("#profileName").textContent = isAdmin()
+    ? "Admin"
+    : "Factory Employee";
 
     $("#profileTitle").textContent = isAdmin()
         ? "Factory Administrator"
         : "Employee Portal";
 
-    $("#profileAvatar").textContent = isAdmin() ? "HK" : "FE";
+    $("#profileAvatar").textContent = isAdmin() ? "A" : "FE";
 
     $("#propertyRole").textContent = isAdmin()
         ? "Factory operations"
