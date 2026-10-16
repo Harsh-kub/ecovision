@@ -226,27 +226,15 @@ function isAdmin() {
 }
 
 function goTo(page) {
-    if (page === "Smart Scan") {
-        state.page = "Digital Twin";
-        state.scanMode = true;
-        state.selectedCamera = null;
-        state.lastResult = null;
-    } else {
-        state.page = page;
-
-        if (page === "Digital Twin") {
-            state.scanMode = false;
-            state.selectedCamera = null;
-            state.lastResult = null;
-        }
-    }
+    state.page = page;
+    state.scanMode = false;
+    state.selectedCamera = null;
+    state.lastResult = null;
+    state.processing = null;
+    state.processingToken += 1;
 
     renderApp();
-
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function currentCameraImage(camera) {
@@ -307,47 +295,112 @@ function renderMetrics() {
    DIGITAL TWIN BUILDING
    ===================================================== */
 
+
+
 function renderBuilding() {
     return `
+        <style>
+            .twin-scene {
+                position: relative;
+                min-height: 440px;
+                overflow: hidden;
+                border-radius: 16px;
+                background: linear-gradient(145deg, #f8f4ef, #e6e9df);
+                border: 1px solid #d7dfd0;
+            }
+            #factory3dCanvas {
+                display: block;
+                width: 100%;
+                height: 440px;
+                cursor: grab;
+            }
+            .twin-controls {
+                position: absolute;
+                top: 14px;
+                right: 14px;
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+            .twin-controls button {
+                border: 1px solid #52654a;
+                background: #f8f4ef;
+                color: #332f2a;
+                padding: 9px 13px;
+                border-radius: 9px;
+                cursor: pointer;
+                font-weight: 600;
+            }
+            .twin-controls button:hover {
+                background: #52654a;
+                color: white;
+            }
+            .twin-status {
+                position: absolute;
+                left: 14px;
+                bottom: 12px;
+                color: #52654a;
+                background: #f8f4efdd;
+                padding: 8px 12px;
+                border-radius: 8px;
+                font-size: 12px;
+            }
+            .twin-floor-list {
+                display: grid;
+                grid-template-columns: repeat(auto-fit,minmax(125px,1fr));
+                gap: 10px;
+                padding: 16px 0 5px;
+            }
+        </style>
+
         <div class="building-stage">
             <div class="building-label">
                 XYZ STEEL FACTORY · DIGITAL TWIN
             </div>
 
-            <div style="
-                display:grid;
-                grid-template-columns:repeat(auto-fit,minmax(125px,1fr));
-                gap:10px;
-                padding:20px 0 5px;
-            ">
+            <p style="color:#52654a">
+                Explore the factory in 3D. Select a floor to inspect its cameras.
+            </p>
+
+            <div class="twin-scene">
+                <canvas id="factory3dCanvas"
+                    aria-label="Interactive 3D factory model"></canvas>
+
+                <div class="twin-controls">
+                    <button type="button" data-building-rotation>
+                        Auto-Rotate: ON
+                    </button>
+                    <button type="button" data-building-reset>
+                        Reset View
+                    </button>
+                </div>
+
+                <div class="twin-status" id="factory3dStatus">
+                    Loading 3D factory...
+                </div>
+            </div>
+
+            <div class="twin-floor-list">
                 ${factoryFloors.map(floor => `
-                    <button
-                        type="button"
+                    <button type="button"
                         data-floor="${floor.floor}"
                         class="floor-card ${state.selectedFloor === floor.floor ? "selected" : ""}"
-                        style="padding:8px 5px"
-                    >
-                        <img
-                            src="${floor.image}"
-                            alt="${floor.name}"
-                            style="width:100%;height:75px;object-fit:cover;border-radius:7px"
-                        >
-                        <strong style="display:block;margin-top:8px">${floor.name}</strong>
+                        style="padding:8px 5px">
+                        <img src="${floor.image}" alt="${floor.name}"
+                            style="width:100%;height:75px;object-fit:cover;border-radius:7px">
+                        <strong style="display:block;margin-top:8px">
+                            ${floor.name}
+                        </strong>
                         <small>4 cameras</small>
                     </button>
                 `).join("")}
 
-                <button
-                    type="button"
-                    data-floor="5"
+                <button type="button" data-floor="5"
                     class="floor-card ${state.selectedFloor === 5 ? "selected" : ""}"
-                    style="padding:8px 5px"
-                >
-                    <img
-                        src="${messPhotos[0].image}"
-                        alt="Food Mess"
-                        style="width:100%;height:75px;object-fit:cover;border-radius:7px"
-                    >
+                    style="padding:8px 5px">
+                    <img src="${messPhotos[0].image}" alt="Food Mess"
+                        style="width:100%;height:75px;object-fit:cover;border-radius:7px">
                     <strong style="display:block;margin-top:8px">Floor 5</strong>
                     <small>Food Mess</small>
                 </button>
@@ -355,6 +408,421 @@ function renderBuilding() {
         </div>
     `;
 }
+
+let factory3dAutoRotate = true;
+let factory3dInstance = null;
+
+function loadThreeJS() {
+    if (window.THREE) return Promise.resolve(window.THREE);
+
+    if (window.factoryThreeLoading) {
+        return window.factoryThreeLoading;
+    }
+
+    window.factoryThreeLoading = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src =
+            "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+
+        script.onload = () => {
+            if (window.THREE) resolve(window.THREE);
+            else reject(new Error("Three.js did not initialize."));
+        };
+
+        script.onerror = () => reject(
+            new Error("Could not load Three.js. Check your internet connection.")
+        );
+
+        document.head.appendChild(script);
+    });
+
+    return window.factoryThreeLoading;
+}
+
+function initFactory3D() {
+    const canvas = document.getElementById("factory3dCanvas");
+    const status = document.getElementById("factory3dStatus");
+
+    if (!canvas || !canvas.isConnected) return;
+
+    if (factory3dInstance?.dispose) {
+        factory3dInstance.dispose();
+    }
+
+    loadThreeJS()
+        .then(THREE => {
+            if (!canvas.isConnected) return;
+
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color("#c9dce8");
+
+            const camera = new THREE.PerspectiveCamera(
+                38,
+                canvas.clientWidth / 440,
+                0.1,
+                100
+            );
+            camera.position.set(9, 7, 12);
+            camera.lookAt(0, 2.5, 0);
+
+            const renderer = new THREE.WebGLRenderer({
+                canvas,
+                antialias: true,
+                alpha: false
+            });
+
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.setSize(canvas.clientWidth, 440, false);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            const ambient = new THREE.HemisphereLight(
+                0xffffff, 0x777766, 2.0
+            );
+            scene.add(ambient);
+
+            const sunlight = new THREE.DirectionalLight(0xffffff, 2.2);
+            sunlight.position.set(7, 12, 8);
+            sunlight.castShadow = true;
+            scene.add(sunlight);
+
+            const factory = new THREE.Group();
+            scene.add(factory);
+
+            const materials = {
+                wall: new THREE.MeshStandardMaterial({
+                     color: "#b5b7a8",
+                     roughness: 0.72,
+                    metalness: 0.08
+                }),
+                dark: new THREE.MeshStandardMaterial({
+                     color: "#535b50",
+                    roughness: 0.65,
+                     metalness: 0.18
+                }),
+                roof: new THREE.MeshStandardMaterial({
+                    color: "#874b43", roughness: 0.7
+                }),
+                glass: new THREE.MeshStandardMaterial({
+                     color: "#527985",
+                     metalness: 0.35,
+                    roughness: 0.22
+                }),
+                floor: new THREE.MeshStandardMaterial({
+                    color: "#d5d0c5", roughness: 1
+                }),
+                selected: new THREE.MeshStandardMaterial({
+                    color: "#c43d3d", roughness: 0.7
+                })
+            };
+
+            function addBox(w, h, d, material, x, y, z, parent = factory) {
+                const mesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(w, h, d), material
+                );
+                mesh.position.set(x, y, z);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                parent.add(mesh);
+                return mesh;
+            }
+
+            // Factory foundation
+            addBox(7.2, 0.25, 4.8, materials.floor, 0, 0, 0);
+
+            const floorMeshes = [];
+
+            // Five separate levels, with the Food Mess on level five.
+            for (let level = 1; level <= 5; level++) {
+                const y = 0.45 + (level - 1) * 0.95;
+                const material = level === state.selectedFloor
+                    ? materials.selected : materials.wall;
+
+                const room = new THREE.Group();
+                room.userData.floor = level;
+                factory.add(room);
+
+                // Main floor slab and walls
+                addBox(6.5, 0.12, 4.0, materials.dark, 0, y, 0, room);
+                addBox(6.5, 0.75, 0.12, material, 0, y + 0.42, -1.94, room);
+                addBox(0.12, 0.75, 4.0, materials.dark, -3.19, y + 0.42, 0, room);
+                addBox(0.12, 0.75, 4.0, materials.dark, 3.19, y + 0.42, 0, room);
+
+                // Front window panels
+                for (let i = 0; i < 5; i++) {
+                    addBox(
+                        0.82, 0.4, 0.035, materials.glass,
+                        -2.5 + i * 1.25, y + 0.43, 2.01, room
+                    );
+                }
+
+                // Industrial steel columns
+                for (const x of [-3.15, 0, 3.15]) {
+                    addBox(0.13, 0.9, 0.13, materials.dark,
+                        x, y + 0.45, 1.92, room);
+                }
+
+                floorMeshes.push(room);
+            }
+
+            // Industrial roof
+            addBox(7.0, 0.22, 4.5, materials.roof, 0, 5.25, 0);
+
+            // Roof ribs
+            for (let x = -3; x <= 3; x += 1) {
+                addBox(0.06, 0.08, 4.35, materials.dark, x, 5.4, 0);
+            }
+
+            // Chimney
+            addBox(0.55, 1.25, 0.55, materials.dark, 2.5, 5.95, -1.2);
+
+            // Ground plane
+            
+            // ===== IMPROVED FACTORY CAMPUS =====
+          const campusGrass = new THREE.MeshBasicMaterial({
+    color: "#71845d",
+    roughness: 1,
+    metalness: 0
+});
+
+
+
+
+const pavementMat = new THREE.MeshBasicMaterial({
+    color: "#202020"
+});
+
+const markingMat = new THREE.MeshStandardMaterial({
+    color: "#d8d2b8",
+    roughness: 1
+});
+
+const barkMat = new THREE.MeshStandardMaterial({
+    color: "#6b4b35",
+    roughness: 1
+});
+
+const leaves = [
+    "#466744", "#5d794a", "#708b52", "#3e6041"
+].map(color => new THREE.MeshStandardMaterial({
+    color,
+    roughness: 1
+}));
+
+function campusBox(w, h, d, material, x, y, z) {
+    const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, d), material
+    );
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    return mesh;
+}
+
+// A continuous green campus surface.
+// Keep this above the original ground plane.
+const campus = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 200),
+    campusGrass
+);
+campus.rotation.x = -Math.PI / 2;
+campus.position.y = -0.12;
+campus.receiveShadow = true;
+scene.add(campus);
+
+// Access road and parking apron
+// Dark asphalt road
+// Wide black asphalt road across the foreground
+const roadMat = new THREE.MeshBasicMaterial({
+    color: "#202020",
+    side: THREE.DoubleSide
+});
+
+campusBox(200, 0.04, 45, roadMat, 0, -0.085, 12);
+// Dashed road centre line
+for (let x = -35; x <= 35; x += 4.5) {
+    campusBox(2.0, 0.015, 0.075, markingMat, x, -0.055, 7.2);
+}
+
+// Realistic layered trees
+function campusTree(x, z, scale = 1) {
+    const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+            0.10 * scale, 0.16 * scale, 1.15 * scale, 10
+        ),
+        barkMat
+    );
+
+    trunk.position.set(x, 0.52 * scale, z);
+    trunk.castShadow = true;
+    scene.add(trunk);
+
+    // Three overlapping foliage layers instead of one sphere
+    for (let i = 0; i < 3; i++) {
+        const crown = new THREE.Mesh(
+            new THREE.SphereGeometry(
+                (0.52 - i * 0.045) * scale, 14, 12
+            ),
+            leaves[(Math.abs(Math.round(x + z)) + i) % leaves.length]
+        );
+
+        crown.scale.set(1, 1.12, 0.92);
+        crown.position.set(
+            x,
+            (1.15 + i * 0.32) * scale,
+            z
+        );
+        crown.castShadow = true;
+        scene.add(crown);
+    }
+}
+
+// More trees around the site, away from the building entrance
+[
+    [-10, 1, 1.15], [-12, 4, 0.9], [-11, 9, 1.1],
+    [-9, 13, 0.85], [-15, 6, 1.25], [-17, 11, 1.0],
+    [-7, -5, 0.95], [-12, -8, 1.2], [-16, -3, 0.9],
+    [10, 1, 1.0], [12, 4, 1.15], [11, 9, 0.9],
+    [9, 13, 1.1], [15, 6, 1.2], [17, 11, 0.95],
+    [7, -5, 1.15], [12, -8, 0.9], [16, -3, 1.1],
+    [-20, 3, 1.1], [-21, 9, 0.9],
+    [20, 3, 1.0], [21, 9, 1.15]
+].forEach(([x, z, scale]) => campusTree(x, z, scale));
+
+// Low landscaped planting beds
+const planterMat = new THREE.MeshStandardMaterial({
+    color: "#667b50",
+    roughness: 1
+});
+
+campusBox(1.0, 0.20, 5.0, planterMat, -5.0, 0.0, 1.0);
+campusBox(1.0, 0.20, 5.0, planterMat, 5.0, 0.0, 1.0);
+
+// Simple parking-bay lines
+for (let x = -4; x <= 4; x += 1.4) {
+    campusBox(0.045, 0.012, 1.6, markingMat, x, -0.045, 5.2);
+}
+
+// ===== END IMPROVED FACTORY CAMPUS =====
+
+// ===== END FACTORY CAMPUS =====
+
+            let dragging = false;
+            let lastX = 0;
+            let lastY = 0;
+            let rotationY = -0.35;
+            let rotationX = 0;
+            let frameId;
+            const raycaster = new THREE.Raycaster();
+            const pointer = new THREE.Vector2();
+
+            function resize() {
+                if (!canvas.isConnected) return;
+                const width = canvas.clientWidth || 600;
+                renderer.setSize(width, 440, false);
+                camera.aspect = width / 440;
+                camera.updateProjectionMatrix();
+            }
+
+            function animate() {
+                if (!canvas.isConnected) {
+                    renderer.dispose();
+                    return;
+                }
+
+                frameId = requestAnimationFrame(animate);
+
+                if (factory3dAutoRotate && !dragging) {
+                    rotationY += 0.0025;
+                }
+
+                factory.rotation.y = rotationY;
+                factory.rotation.x = rotationX;
+                renderer.render(scene, camera);
+            }
+
+            canvas.addEventListener("pointerdown", event => {
+                dragging = true;
+                lastX = event.clientX;
+                lastY = event.clientY;
+                canvas.setPointerCapture(event.pointerId);
+                canvas.style.cursor = "grabbing";
+            });
+
+            canvas.addEventListener("pointermove", event => {
+                if (!dragging) return;
+
+                rotationY += (event.clientX - lastX) * 0.008;
+                rotationX += (event.clientY - lastY) * 0.004;
+                rotationX = Math.max(-0.35, Math.min(0.35, rotationX));
+
+                lastX = event.clientX;
+                lastY = event.clientY;
+            });
+
+            function stopDragging() {
+                dragging = false;
+                canvas.style.cursor = "grab";
+            }
+
+            canvas.addEventListener("pointerup", stopDragging);
+            canvas.addEventListener("pointercancel", stopDragging);
+
+            canvas.addEventListener("click", event => {
+                const rect = canvas.getBoundingClientRect();
+                pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(pointer, camera);
+                const hits = raycaster.intersectObjects(factory.children, true);
+                const floorObject = hits.find(hit => {
+                    let object = hit.object;
+                    while (object && object !== factory) {
+                        if (object.userData.floor) return true;
+                        object = object.parent;
+                    }
+                    return false;
+                });
+
+                if (floorObject) {
+                    let object = floorObject.object;
+                    while (object && object !== factory && !object.userData.floor) {
+                        object = object.parent;
+                    }
+                    if (object?.userData.floor) {
+                        state.selectedFloor = object.userData.floor;
+                        renderPageIntoMain();
+                    }
+                }
+            });
+
+            window.addEventListener("resize", resize);
+            resize();
+
+            if (status) status.textContent =
+                "Drag to explore · Click a floor · Auto-rotation enabled";
+
+            animate();
+
+            factory3dInstance = {
+                dispose() {
+                    cancelAnimationFrame(frameId);
+                    window.removeEventListener("resize", resize);
+                    renderer.dispose();
+                }
+            };
+        })
+        .catch(error => {
+            console.error("EcoVision 3D error:", error);
+            if (status) {
+                status.textContent =
+                    "3D model unavailable. Check your internet connection and refresh.";
+            }
+        });
+}
+
+
 
 /* =====================================================
    LOGIN — PRESERVE EXISTING LOGIN DESIGN
@@ -606,15 +1074,7 @@ function renderOverview() {
         </div>
 
         <div class="grid columns">
-            <div class="panel">
-                <div class="panel-title">
-                    <div><h3>XYZ Steel Factory Digital Twin</h3>
-                    <p>Four factory floors and the fifth-floor Food Mess</p></div>
-                    <button class="text-button" data-go="Digital Twin">Explore →</button>
-                </div>
-                ${renderBuilding()}
-                <button class="btn primary" data-go="Digital Twin">Select a floor →</button>
-            </div>
+           
 
             <div class="panel">
                 <div class="panel-title">
@@ -1270,7 +1730,39 @@ function renderMachineResult() {
    ===================================================== */
 
 function renderSmartScan() {
-    return renderDigitalTwin();
+    return `
+        <div class="page-heading">
+            <div>
+                <div class="eyebrow">SMART SCAN</div>
+                <h1>Factory Camera Scan</h1>
+                <p>Select a factory floor to scan its cameras.</p>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">
+                <div>
+                    <h3>Select a Floor</h3>
+                    <p>Choose an area to inspect.</p>
+                </div>
+            </div>
+
+            <div class="grid">
+                ${factoryFloors.map(floor => `
+                    <button class="floor-card"
+                        data-floor="${floor.floor}">
+                        <img src="${floor.image}"
+                            alt="${floor.name}"
+                            style="width:100%;height:120px;object-fit:cover;border-radius:8px">
+                        <h3>${floor.name}</h3>
+                        <p>${escapeHTML(floor.purpose)}</p>
+                    </button>
+                `).join("")}
+            </div>
+        </div>
+
+        ${renderCameraWorkspace()}
+    `;
 }
 
 /* =====================================================
@@ -1372,11 +1864,11 @@ async function sendAssistantMessage(question) {
 
 function renderAI() {
     const suggestions = [
-        "How can we reduce factory energy usage?",
-        "How many workers are in the selected area?",
-        "What is the current temperature?",
-        "How is carbon footprint calculated?",
-        "Explain the latest camera analysis"
+        "How can factories reduce their carbon footprint?",
+        "How can factories reduce energy consumption?",
+        "How can industries reduce waste and pollution?",
+        "How can renewable energy make factories more sustainable?",
+        "How is carbon footprint calculated?"
     ];
 
     return `
@@ -1773,6 +2265,10 @@ function renderPage() {
 
 function renderPageIntoMain() {
     $("#mainContent").innerHTML = renderPage();
+        if (state.page === "Digital Twin") {
+        initFactory3D();
+    }
+
 }
 
 function renderApp() {
@@ -1828,6 +2324,24 @@ function renderApp() {
    ===================================================== */
 
 document.addEventListener("click", event => {
+    
+    const rotationButton = event.target.closest("[data-building-rotation]");
+
+    if (rotationButton) {
+        factory3dAutoRotate = !factory3dAutoRotate;
+        rotationButton.textContent =
+            "Auto-Rotate: " + (factory3dAutoRotate ? "ON" : "OFF");
+        return;
+    }
+
+    const resetButton = event.target.closest("[data-building-reset]");
+
+    if (resetButton) {
+        factory3dAutoRotate = true;
+        renderPageIntoMain();
+        return;
+    }
+
     const floorButton = event.target.closest("[data-floor]");
 
     if (floorButton) {
@@ -1867,17 +2381,44 @@ document.addEventListener("click", event => {
         return;
     }
 
-    if (event.target.id === "applyScenario") {
-        notify("Demo scenario updated.");
-        return;
-    }
+    if (event.target.closest("#scenarioModerate")) {
+    state.energy = 20;
+    state.water = 18;
+    state.recycling = 25;
+    state.productionGrowth = 3;
 
-    if (event.target.id === "resetSimulator") {
-        state.energy = 15;
-        state.water = 12;
-        state.recycling = 20;
-        renderPageIntoMain();
-    }
+    renderPageIntoMain();
+    notify("Moderate plan selected.");
+    return;
+}
+
+if (event.target.closest("#scenarioAmbitious")) {
+    state.energy = 35;
+    state.water = 30;
+    state.recycling = 40;
+    state.productionGrowth = 4;
+
+    renderPageIntoMain();
+    notify("Ambitious plan selected.");
+    return;
+}
+
+if (event.target.closest("#applyScenario")) {
+    renderPageIntoMain();
+    notify("Scenario applied. Forecast updated.");
+    return;
+}
+
+if (event.target.closest("#resetSimulator")) {
+    state.energy = 15;
+    state.water = 12;
+    state.recycling = 20;
+    state.productionGrowth = 3;
+
+    renderPageIntoMain();
+    notify("Simulator reset.");
+    return;
+}
 });
 
 /* =====================================================
